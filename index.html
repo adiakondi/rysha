@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Rysha – Join the Waitlist</title>
+  <title>rysha – Join the Waitlist</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -151,7 +151,7 @@
     footer {
       margin-top: auto;
       padding-top: 3rem;
-      color: var(--gray);
+      color: var(--white);
       font-size: 0.9rem;
     }
 
@@ -164,31 +164,45 @@
 <body>
 
   <div class="container">
-    <img src="ryshaLogo.png" alt="Rysha Logo" class="logo">
+    <img src="ryshaLogo.png" alt="rysha Logo" class="logo">
 
-    <h1>Get Early Access to Rysha</h1>
+    <h1>Get early access to rysha!</h1>
     <p class="tagline">
-      A mobile app that connects short-term rental hosts with reliable tradespeople — fast. Book jobs in seconds, schedule via Google Calendar, and get work done on time.
+    An app for fast, reliable repairs for rental owners. rysha connects landlords with trusted pros who actually show up — fast. Clear scope, clear price, and no back-and-forth texting.    
     </p>
 
     <ul class="benefits">
-      <li>Find vetted, local handymen & pros instantly</li>
-      <li>Quick quotes & scheduling</li>
-      <li>Seamless Google Calendar integration</li>
-      <li>Keep guests happy with fast, reliable fixes</li>
+      <li>Instant job acceptance</li>
+      <li>Clear scope upfront</li>
+      <li>Fast scheduling</li>
+      <li>Trusted, reliable pros</li>
+      <li>Simple for owners, worth it for pros</li>
       <li>Be first in line when we launch</li>
     </ul>
 
-    <form id="waitlist-form">
-      <input type="text"    id="name"  placeholder="Your full name"    required autocomplete="name" />
-      <input type="email"   id="email" placeholder="Your email address" required autocomplete="email" />
-      <button type="submit" id="submit-btn">Join the Rysha Waitlist</button>
-    </form>
+<form id="waitlist-form">
+  <input type="text"    id="name"  placeholder="Your full name"    required autocomplete="name" />
+  <input type="email"   id="email" placeholder="Your email address" required autocomplete="email" />
+
+  <div style="text-align: left; margin: 1rem 0;">
+    <p style="font-weight: 600; margin-bottom: 0.75rem; color: var(--navy);">I am a:</p>
+    <label style="display: block; margin-bottom: 0.5rem; cursor: pointer;">
+      <input type="checkbox" name="user_type" value="Landlord/Property Owner" />
+      Landlord / Property Owner
+    </label>
+    <label style="display: block; cursor: pointer;">
+      <input type="checkbox" name="user_type" value="Contractor/Handyman" />
+      Contractor / Handyman
+    </label>
+  </div>
+
+  <button type="submit" id="submit-btn">Join the waitlist</button>
+</form>
 
     <div id="message"></div>
   </div>
 
-  <footer>© 2026 Rysha – Coming soon to iOS & Android</footer>
+  <footer>© 2026 rysha – Coming soon to iOS & Android</footer>
 
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -205,51 +219,67 @@
     const submitBtn  = document.getElementById('submit-btn');
 
     form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      console.log('Form submit triggered');
+        e.preventDefault();
+        console.log('Form submit triggered');
 
-      messageEl.textContent = '';
-      messageEl.className = '';
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Joining...';
+        messageEl.textContent = '';
+        messageEl.className = '';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Joining...';
 
-      const name  = document.getElementById('name').value.trim();
-      const email = document.getElementById('email').value.trim().toLowerCase();
+        const name  = document.getElementById('name').value.trim();
+        const email = document.getElementById('email').value.trim().toLowerCase();
 
-      if (!name || !email) {
-        showMessage('Please fill in both fields.', 'error');
-        resetButton();
-        return;
-      }
+        // Get selected checkboxes
+        const checkboxes = document.querySelectorAll('input[name="user_type"]:checked');
+        const userTypes = Array.from(checkboxes).map(cb => cb.value);
+        const userTypeStr = userTypes.length > 0 ? userTypes.join(', ') : null;
 
-      try {
-        console.log('Attempting insert:', { name, email });
-
-        const { error } = await supabase
-          .from('waitlist')
-          .insert({ name, email });
-
-        if (error) throw error;
-
-        console.log('Insert success');
-        showMessage('🎉 You’re on the list! We’ll notify you at launch.', 'success');
-        form.reset();
-      } catch (err) {
-        console.error('Insert failed:', err);
-        let displayMsg = 'Something went wrong. Please try again.';
-        
-        if (err.code === '23505' || err.message?.includes('duplicate key')) {
-          displayMsg = 'This email is already on the list!';
-        } else if (err.status === 401 || err.status === 403) {
-          displayMsg = 'Permission issue – contact support if this persists.';
-        } else if (err.message) {
-          displayMsg = err.message;
+        // Validation
+        if (!name || !email) {
+            showMessage('Please fill in both name and email.', 'error');
+            resetButton();
+            return;
         }
 
-        showMessage(displayMsg, 'error');
-      } finally {
-        resetButton();
-      }
+        if (userTypes.length === 0) {
+            showMessage('Please select at least one role (Landlord or Contractor).', 'error');
+            resetButton();
+            return;
+        }
+
+        try {
+            console.log('Attempting insert:', { name, email, user_type: userTypeStr });
+
+            const { error } = await supabase
+            .from('waitlist')
+            .insert({ 
+                name, 
+                email,
+                user_type: userTypeStr 
+            });
+
+            if (error) throw error;
+
+            console.log('Insert success');
+            showMessage('🎉 You’re on the list! We’ll notify you at launch.', 'success');
+            form.reset();
+        } catch (err) {
+            console.error('Insert failed:', err);
+            let displayMsg = 'Something went wrong. Please try again.';
+            
+            if (err.code === '23505' || err.message?.includes('duplicate key')) {
+            displayMsg = 'This email is already on the list!';
+            } else if (err.status === 401 || err.status === 403) {
+            displayMsg = 'Permission issue – contact support if this persists.';
+            } else if (err.message) {
+            displayMsg = err.message;
+            }
+
+            showMessage(displayMsg, 'error');
+        } finally {
+            resetButton();
+        }
     });
 
     function showMessage(text, type) {
@@ -259,7 +289,7 @@
 
     function resetButton() {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Join the Rysha Waitlist';
+      submitBtn.textContent = 'Join the waitlist';
     }
   </script>
 </body>
