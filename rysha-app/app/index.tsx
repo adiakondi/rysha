@@ -11,17 +11,19 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { supabase } from '@/lib/supabase'; // your alias works
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
-  // Check if already logged in → go to home
+  // Redirect if already logged in
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -31,8 +33,23 @@ export default function AuthScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter email and password');
+    const emailTrim = email.trim();
+    const passTrim = password.trim();
+
+    if (!emailTrim) {
+      Alert.alert('Error', 'Email is required');
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(emailTrim)) {
+      Alert.alert('Error', 'Please enter a valid email');
+      return;
+    }
+    if (!passTrim) {
+      Alert.alert('Error', 'Password is required');
+      return;
+    }
+    if (passTrim.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
@@ -42,13 +59,13 @@ export default function AuthScreen() {
       let result;
       if (isSignUp) {
         result = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password.trim(),
+          email: emailTrim,
+          password: passTrim,
         });
       } else {
         result = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password.trim(),
+          email: emailTrim,
+          password: passTrim,
         });
       }
 
@@ -75,19 +92,20 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
+      style={styles.flex1}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.innerContainer}>
+        <View style={styles.inner}>
           <Text style={styles.title}>rysha</Text>
           <Text style={styles.subtitle}>
             {isSignUp ? 'Create your account' : 'Sign in to continue'}
           </Text>
 
+          {/* Email Input */}
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -99,16 +117,30 @@ export default function AuthScreen() {
             textContentType="emailAddress"
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCorrect={false}
-            textContentType={isSignUp ? 'newPassword' : 'password'}
-          />
+          {/* Password Input with Toggle */}
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCorrect={false}
+              textContentType={isSignUp ? 'newPassword' : 'password'}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeButton}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off' : 'eye'}
+                size={24}
+                color="#64748b"
+              />
+            </TouchableOpacity>
+          </View>
 
+          {/* Submit Button */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleSubmit}
@@ -125,6 +157,7 @@ export default function AuthScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Toggle Login/Signup */}
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => setIsSignUp(!isSignUp)}
@@ -142,10 +175,13 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
+  flex1: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
   },
-  innerContainer: {
+  inner: {
     flex: 1,
     padding: 32,
     justifyContent: 'center',
@@ -172,6 +208,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 16,
     backgroundColor: 'white',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: 'white',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+  },
+  eyeButton: {
+    paddingHorizontal: 16,
   },
   button: {
     backgroundColor: '#ea580c',

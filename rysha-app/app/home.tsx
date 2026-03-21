@@ -1,10 +1,30 @@
 // app/home.tsx
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function Home() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          setUserEmail(session.user.email);
+        }
+      } catch (err) {
+        console.error('Error loading user:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -16,12 +36,11 @@ export default function Home() {
           text: 'Log Out',
           style: 'destructive',
           onPress: async () => {
-            try {
-              const { error } = await supabase.auth.signOut();
-              if (error) throw error;
-              router.replace('/'); // back to login
-            } catch (err: any) {
-              Alert.alert('Logout failed', err.message || 'Something went wrong');
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              Alert.alert('Error', error.message);
+            } else {
+              router.replace('/');
             }
           },
         },
@@ -31,22 +50,30 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to rysha</Text>
-      <Text style={styles.subtitle}>You're logged in</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#ea580c" />
+      ) : (
+        <>
+          <Text style={styles.title}>
+            Hi{userEmail ? `, ${userEmail.split('@')[0]}` : ''}!
+          </Text>
+          <Text style={styles.subtitle}>Welcome to rysha</Text>
 
-      {/* Placeholder for future dashboard content */}
-      <View style={styles.dashboardCard}>
-        <Text style={styles.cardTitle}>Quick Actions</Text>
-        <Text style={styles.cardText}>
-          • Post a new job (coming soon){'\n'}
-          • Browse open jobs (coming soon){'\n'}
-          • Your profile
-        </Text>
-      </View>
+          {/* Placeholder for future dashboard content */}
+          <View style={styles.dashboardCard}>
+            <Text style={styles.cardTitle}>Quick Actions</Text>
+            <Text style={styles.cardText}>
+              • Post a new job (coming soon){'\n'}
+              • Browse open jobs (coming soon){'\n'}
+              • View your profile
+            </Text>
+          </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.buttonText}>Log Out</Text>
-      </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.buttonText}>Log Out</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
@@ -62,7 +89,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '700',
     color: '#0f172a',
-    marginTop: 60,
+    marginTop: 80,
     marginBottom: 8,
   },
   subtitle: {
