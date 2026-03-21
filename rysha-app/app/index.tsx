@@ -74,13 +74,22 @@ export default function AuthScreen() {
       if (error) throw error;
 
       if (isSignUp) {
-        Alert.alert(
-          'Success',
-          'Account created! Please check your email to confirm.',
-          [{ text: 'OK', onPress: () => setIsSignUp(false) }]
-        );
+        // No alert — directly navigate to setup
+        router.replace('/profile-setup');
       } else {
-        router.replace('/home');
+        // Normal login: check if profile exists first
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', result.data.user?.id)
+          .single();
+
+        if (!profile) {
+          // First time — needs setup
+          router.replace('/profile-setup');
+        } else {
+          router.replace('/home');
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Something went wrong');

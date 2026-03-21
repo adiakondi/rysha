@@ -1,51 +1,47 @@
 // app/home.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function Home() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
+    const fetchProfile = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email) {
-          setUserEmail(session.user.email);
+        if (!session?.user?.id) {
+          router.replace('/');
+          return;
         }
-      } catch (err) {
-        console.error('Error loading user:', err);
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+          throw error;
+        }
+
+        setDisplayName(data?.display_name || null);
+      } catch (err: any) {
+        console.error('Failed to load display name:', err);
+        Alert.alert('Error', 'Could not load your profile');
       } finally {
         setLoading(false);
       }
     };
 
-    loadUser();
+    fetchProfile();
   }, []);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-              Alert.alert('Error', error.message);
-            } else {
-              router.replace('/');
-            }
-          },
-        },
-      ]
-    );
+  const goToProfile = () => {
+    router.push('/profile');
   };
 
   return (
@@ -54,23 +50,26 @@ export default function Home() {
         <ActivityIndicator size="large" color="#ea580c" />
       ) : (
         <>
-          <Text style={styles.title}>
-            Hi{userEmail ? `, ${userEmail.split('@')[0]}` : ''}!
+          <Text style={styles.greeting}>
+            Hi{ displayName ? `, ${displayName}` : '' }!
           </Text>
-          <Text style={styles.subtitle}>Welcome to rysha</Text>
+          <Text style={styles.subtitle}>
+            {displayName ? 'Welcome to rysha' : 'Welcome to rysha'}
+          </Text>
 
-          {/* Placeholder for future dashboard content */}
+          {/* Dashboard card */}
           <View style={styles.dashboardCard}>
             <Text style={styles.cardTitle}>Quick Actions</Text>
             <Text style={styles.cardText}>
               • Post a new job (coming soon){'\n'}
               • Browse open jobs (coming soon){'\n'}
-              • View your profile
+              • Update your profile
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.buttonText}>Log Out</Text>
+          {/* Button to profile (where logout lives) */}
+          <TouchableOpacity style={styles.profileButton} onPress={goToProfile}>
+            <Text style={styles.profileButtonText}>My Profile</Text>
           </TouchableOpacity>
         </>
       )}
@@ -85,8 +84,8 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  title: {
-    fontSize: 36,
+  greeting: {
+    fontSize: 40,
     fontWeight: '700',
     color: '#0f172a',
     marginTop: 80,
@@ -121,8 +120,8 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 24,
   },
-  logoutButton: {
-    backgroundColor: '#ea580c',
+  profileButton: {
+    backgroundColor: '#371fea',
     paddingVertical: 16,
     paddingHorizontal: 48,
     borderRadius: 12,
@@ -131,7 +130,7 @@ const styles = StyleSheet.create({
     width: '80%',
     alignItems: 'center',
   },
-  buttonText: {
+  profileButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
