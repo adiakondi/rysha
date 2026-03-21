@@ -8,6 +8,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,11 +31,25 @@ export default function LoginScreen() {
     }
   };
 
+  const handleSignUp = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({ email, password });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Sign up failed', error.message);
+    } else {
+      Alert.alert('Success', 'Account created! Please log in.', [
+        { text: 'OK', onPress: () => setIsSignUp(false) }
+      ]);
+    }
+  };
+
   // If already logged in → redirect to home
   // But since we have no global session check yet, we'll add it later
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Rysha</Text>
+      <Text style={styles.title}>rysha</Text>
 
       <TextInput
         style={styles.input}
@@ -52,8 +67,20 @@ export default function LoginScreen() {
         secureTextEntry
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={isSignUp ? handleSignUp : handleLogin} 
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign Up' : 'Sign In')}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.toggleButton} onPress={() => setIsSignUp(!isSignUp)}>
+        <Text style={styles.toggleText}>
+          {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -65,4 +92,6 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, marginBottom: 16 },
   button: { backgroundColor: '#ea580c', padding: 16, borderRadius: 12, alignItems: 'center' },
   buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  toggleButton: { marginTop: 20, alignItems: 'center' },
+  toggleText: { color: '#ea580c', fontSize: 14, fontWeight: '500' },
 });

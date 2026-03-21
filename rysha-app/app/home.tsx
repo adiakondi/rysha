@@ -14,7 +14,7 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Rysha!</Text>
+      <Text style={styles.title}>Welcome to rysha!</Text>
       <Text style={styles.subtitle}>You're logged in</Text>
 
       <TouchableOpacity style={styles.button} onPress={handleLogout}>
