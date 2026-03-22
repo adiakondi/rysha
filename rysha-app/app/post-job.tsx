@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import ModalSelector from 'react-native-modal-selector';
 
 export default function PostJob() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function PostJob() {
   const [saving, setSaving] = useState(false);
   const [role, setRole] = useState<'landlord' | 'contractor' | null>(null);
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [dateNeeded, setDateNeeded] = useState('');
@@ -76,6 +78,7 @@ export default function PostJob() {
         .insert({
           user_id: session.user.id,
           title: title.trim(),
+          category: category || null,
           description: description.trim() || null,
           location: location.trim() || null,
           date_needed: dateNeeded || null,
@@ -133,6 +136,39 @@ export default function PostJob() {
         onChangeText={setTitle}
         placeholder="e.g. Fix leaking faucet"
       />
+
+      <Text style={styles.label}>Job Category</Text>
+      <ModalSelector
+        data={[
+          { key: '', label: 'Select category' },
+          { key: 'plumbing', label: 'Plumbing' },
+          { key: 'electrical', label: 'Electrical' },
+          { key: 'painting', label: 'Painting' },
+          { key: 'carpentry', label: 'Carpentry' },
+          { key: 'general', label: 'General Handyman' },
+          { key: 'hvac', label: 'HVAC' },
+          { key: 'other', label: 'Other' },
+        ]}
+        initValue="Select category"
+        onChange={(option) => setCategory(option.key)}
+        style={styles.modalSelector}
+        selectTextStyle={styles.selectText}
+        optionContainerStyle={styles.optionContainer}
+        optionTextStyle={styles.optionText}
+        cancelText="Cancel"
+        cancelContainerStyle={styles.cancelButton}
+      >
+        <View style={styles.inputWrapper}>
+          <Text style={[
+            styles.selectedText,
+            !category && styles.placeholderText
+          ]}>
+            {category 
+              ? category.charAt(0).toUpperCase() + category.slice(1) 
+              : 'Select category'}
+          </Text>
+        </View>
+      </ModalSelector>
 
       <Text style={styles.label}>Description</Text>
       <TextInput
@@ -244,34 +280,9 @@ const styles = StyleSheet.create({
     height: 120,
     textAlignVertical: 'top',
   },
-  roleButtons: {
-    flexDirection: 'column',
-    gap: 12,
-    marginBottom: 32,
-  },
-  roleButton: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: 'white',
-  },
-  roleButtonActive: {
-    borderColor: '#ea580c',
-    backgroundColor: '#fff7f0',
-  },
-  roleButtonText: {
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  roleButtonTextActive: {
-    color: '#ea580c',
-    fontWeight: '600',
-  },
   postButton: {
     backgroundColor: '#ea580c',
-    padding: 16,
+    padding: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 16,
@@ -291,5 +302,43 @@ const styles = StyleSheet.create({
   backText: {
     color: '#64748b',
     fontSize: 16,
+  },
+
+  // ModalSelector styles
+  inputWrapper: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: 'white',
+    marginBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedText: {
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  placeholderText: {
+    color: '#94a3b8',
+  },
+  modalSelector: {
+    width: '100%',
+  },
+  selectText: {
+    color: '#94a3b8', // placeholder color
+  },
+  optionContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  optionText: {
+    color: '#0f172a',
+    fontSize: 18,
+  },
+  cancelButton: {
+    backgroundColor: '#f1f5f9',
   },
 });
