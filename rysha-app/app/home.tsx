@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 export default function Home() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [role, setRole] = useState<'landlord' | 'contractor' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,17 +21,18 @@ export default function Home() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name')
+          .select('display_name, role')
           .eq('id', session.user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+        if (error && error.code !== 'PGRST116') {
           throw error;
         }
 
         setDisplayName(data?.display_name || null);
+        setRole(data?.role || null);
       } catch (err: any) {
-        console.error('Failed to load display name:', err);
+        console.error('Failed to load profile:', err);
         Alert.alert('Error', 'Could not load your profile');
       } finally {
         setLoading(false);
@@ -40,9 +42,8 @@ export default function Home() {
     fetchProfile();
   }, []);
 
-  const goToProfile = () => {
-    router.push('/profile');
-  };
+  const goToPostJob = () => router.push('/post-job');
+  const goToAvailableJobs = () => router.push('/available-jobs');
 
   return (
     <View style={styles.container}>
@@ -54,28 +55,34 @@ export default function Home() {
             Hi{ displayName ? `, ${displayName}` : '' }!
           </Text>
           <Text style={styles.subtitle}>
-            {displayName ? 'Welcome to rysha' : 'Welcome to rysha'}
+            {displayName ? 'Welcome back' : 'Welcome to rysha'}
           </Text>
 
           {/* Dashboard card */}
           <View style={styles.dashboardCard}>
             <Text style={styles.cardTitle}>Quick Actions</Text>
             <Text style={styles.cardText}>
-              • Post a new job (coming soon){'\n'}
-              • Browse open jobs (coming soon){'\n'}
-              • Update your profile
+              • {role === 'landlord' ? 'Manage your posted jobs' : 'Browse and accept jobs'}
+              {'\n'}• Update your profile
+              {'\n'}• View messages (coming soon)
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/post-job')}
-          >
-            <Text style={styles.actionButtonText}>Post a Job</Text>
-          </TouchableOpacity>
+          {/* Role-specific action button */}
+          {role === 'landlord' ? (
+            <TouchableOpacity style={styles.actionButton} onPress={goToPostJob}>
+              <Text style={styles.actionButtonText}>Post a New Job</Text>
+            </TouchableOpacity>
+          ) : role === 'contractor' ? (
+            <TouchableOpacity style={styles.actionButton} onPress={goToAvailableJobs}>
+              <Text style={styles.actionButtonText}>View Available Jobs</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.noRoleText}>Role not set — please update your profile</Text>
+          )}
 
-          {/* Button to profile (where logout lives) */}
-          <TouchableOpacity style={styles.profileButton} onPress={goToProfile}>
+          {/* Link to profile */}
+          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/profile')}>
             <Text style={styles.profileButtonText}>My Profile</Text>
           </TouchableOpacity>
         </>
@@ -101,7 +108,27 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 20,
     color: '#64748b',
-    marginBottom: 48,
+    marginBottom: 32,
+  },
+  actionButton: {
+    backgroundColor: '#ea580c',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+    marginBottom: 40,
+    width: '80%',
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  noRoleText: {
+    fontSize: 16,
+    color: '#dc2626',
+    textAlign: 'center',
+    marginBottom: 32,
   },
   dashboardCard: {
     backgroundColor: 'white',
@@ -128,12 +155,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   profileButton: {
-    backgroundColor: '#371fea',
+    backgroundColor: '#0f172a',
     paddingVertical: 16,
     paddingHorizontal: 48,
     borderRadius: 12,
     marginTop: 'auto',
-    marginBottom: 10,
+    marginBottom: 40,
     width: '80%',
     alignItems: 'center',
   },
@@ -142,18 +169,4 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  actionButton: {
-    backgroundColor: '#ea580c',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 12,
-    marginBottom: 16,
-    width: '80%',
-    alignItems: 'center',
-},
-actionButtonText: {
-  color: 'white',
-  fontSize: 18,
-  fontWeight: '600',
-},
 });

@@ -56,47 +56,87 @@ export default function PostJob() {
     }
   };
 
-  const handlePostJob = async () => {
-    if (role !== 'landlord') {
-      Alert.alert('Access Denied', 'Only landlords can post jobs');
-      return;
-    }
+const handlePostJob = async () => {
+  if (role !== 'landlord') {
+    Alert.alert('Access Denied', 'Only landlords can post jobs');
+    return;
+  }
 
-    if (!title.trim()) {
-      Alert.alert('Error', 'Job title is required');
-      return;
-    }
+  if (!title.trim()) {
+    Alert.alert('Error', 'Job title is required');
+    return;
+  }
 
-    setSaving(true);
+  setSaving(true);
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) throw new Error('No user session');
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) throw new Error('No user session');
 
-      const { error } = await supabase
+    const landlordId = session.user.id;
+
+    // Step 1: Create the job
+    const { data: newJob, error: insertError } = await supabase
+      .from('jobs')
+      .insert({
+        user_id: landlordId,
+        title: title.trim(),
+        category: category || null,
+        description: description.trim() || null,
+        location: location.trim() || null,
+        date_needed: dateNeeded || null,
+        time_needed: timeNeeded || null,
+        status: 'open',
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    // Step 2: Find first available contractor
+    const { data: availableContractor, error: findError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'contractor')
+      .eq('is_available', true)
+      .limit(1)
+      .single();
+
+    if (findError && findError.code !== 'PGRST116') {
+      console.warn('No available contractor found or error:', findError);
+      // Job stays open if no contractor available
+    } else if (availableContractor) {
+      // Assign to contractor
+      const { error: assignError } = await supabase
         .from('jobs')
-        .insert({
-          user_id: session.user.id,
-          title: title.trim(),
-          category: category || null,
-          description: description.trim() || null,
-          location: location.trim() || null,
-          date_needed: dateNeeded || null,
-          time_needed: timeNeeded || null,
-          status: 'open',
-        });
+        .update({
+          assigned_to: availableContractor.id,
+          assigned_at: new Date().toISOString(),
+          status: 'assigned',
+        })
+        .eq('id', newJob.id);
 
-      if (error) throw error;
+      if (assignError) throw assignError;
 
-      Alert.alert('Success', 'Job posted!', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not post job');
-    } finally {
-      setSaving(false);
+      Alert.alert(
+        'Success',
+        `Job posted and auto-assigned to a contractor!`,
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } else {
+      Alert.alert(
+        'Success',
+        'Job posted! No available contractors right now — it will be visible to all contractors.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
     }
-  };
+  } catch (err: any) {
+    console.error('Post job error:', err);
+    Alert.alert('Error', err.message || 'Could not post job');
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading) {
     return (

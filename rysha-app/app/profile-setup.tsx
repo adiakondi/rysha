@@ -57,7 +57,7 @@ export default function ProfileSetup() {
       if (error) throw error;
 
       Alert.alert('Welcome!', 'Profile setup complete.', [
-        { text: 'Continue', onPress: () => router.replace('/(tabs)') },
+        { text: 'Continue', onPress: () => router.replace('/') },
       ]);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not save profile');
