@@ -29,58 +29,84 @@ export default function AvailableJobs() {
     initialize();
   }, []);
 
-  const initialize = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        router.replace('/');
-        return;
-      }
+const initialize = async () => {
+  try {
+    console.log('[DEBUG] Starting initialize...');
 
-      setUserId(session.user.id);
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[DEBUG] getSession result:', { sessionExists: !!session, error: sessionError });
 
-      // Load contractor's settings
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_available, rate_min, rate_max')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profile) {
-        setIsAvailable(profile.is_available || false);
-        setMinRate(profile.rate_min?.toString() || '');
-        setMaxRate(profile.rate_max?.toString() || '');
-      }
-
-      await loadOpenJobs();
-    } catch (err) {
-      console.error('Initialization failed:', err);
-      Alert.alert('Error', 'Failed to load your data');
-    } finally {
-      setLoading(false);
+    if (sessionError || !session?.user?.id) {
+      console.warn('[DEBUG] No valid session or user ID — redirecting to login');
+      router.replace('/');
+      return;
     }
-  };
 
-  const loadOpenJobs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('status', 'open')
-        .order('created_at', { ascending: false });
+    const uid = session.user.id;
+    console.log('[DEBUG] Valid user ID loaded:', uid);
 
-      if (error) throw error;
+    // Load profile using uid directly
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_available, rate_min, rate_max')
+      .eq('id', uid)
+      .single();
 
-      setJobs(data || []);
-    } catch (err) {
-      console.error('Failed to load jobs:', err);
-      Alert.alert('Error', 'Could not load available jobs');
+    console.log('[DEBUG] Profile fetch:', { profile, profileError });
+
+    if (profile) {
+      setIsAvailable(profile.is_available || false);
+      setMinRate(profile.rate_min?.toString() || '');
+      setMaxRate(profile.rate_max?.toString() || '');
     }
-  };
+
+    // Pass uid to loadOpenJobs
+    await loadOpenJobs(uid);
+  } catch (err) {
+    console.error('[DEBUG] Initialize crash:', err);
+    Alert.alert('Error', 'Failed to load data');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const loadOpenJobs = async (uid: string) => {
+  try {
+    console.log('[DEBUG] Loading jobs with exclusion for userId:', uid);
+
+    const query = supabase
+      .from('jobs')
+      .select('*', { count: 'exact' })
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+
+    if (uid) {
+      query.neq('user_id', uid);
+    } else {
+      console.warn('[DEBUG] uid is empty — loading all open jobs');
+    }
+
+    const { data, error, count } = await query;
+
+    console.log('[DEBUG] Jobs query result:', { count, dataLength: data?.length, error });
+
+    if (error) throw error;
+
+    setJobs(data || []);
+  } catch (err: any) {
+    console.error('[DEBUG] Jobs query crash:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      hint: err.hint,
+    });
+    Alert.alert('Error', `Failed to load jobs: ${err.message || 'Unknown'}`);
+  }
+};
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadOpenJobs();
+    await loadOpenJobs(userId || '');
     setRefreshing(false);
   };
 
@@ -132,7 +158,7 @@ export default function AvailableJobs() {
       if (error) throw error;
 
       Alert.alert('Success', 'You have accepted the job!');
-      await loadOpenJobs(); // refresh list
+      await loadOpenJobs(userId || ''); // refresh list
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not accept job');
     }
