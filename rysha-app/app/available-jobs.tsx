@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
@@ -17,6 +18,7 @@ import { useRouter } from 'expo-router';
 export default function AvailableJobs() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
   const [isAvailable, setIsAvailable] = useState(false);
   const [minRate, setMinRate] = useState('');
@@ -37,31 +39,49 @@ export default function AvailableJobs() {
 
       setUserId(session.user.id);
 
-      // Load contractor's current settings
+      // Load contractor's settings
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_available, rate_min, rate_max')
         .eq('id', session.user.id)
         .single();
 
-      setIsAvailable(profile?.is_available || false);
-      setMinRate(profile?.rate_min?.toString() || '');
-      setMaxRate(profile?.rate_max?.toString() || '');
+      if (profile) {
+        setIsAvailable(profile.is_available || false);
+        setMinRate(profile.rate_min?.toString() || '');
+        setMaxRate(profile.rate_max?.toString() || '');
+      }
 
-      // Load open jobs
-      const { data: openJobs } = await supabase
+      await loadOpenJobs();
+    } catch (err) {
+      console.error('Initialization failed:', err);
+      Alert.alert('Error', 'Failed to load your data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOpenJobs = async () => {
+    try {
+      const { data, error } = await supabase
         .from('jobs')
         .select('*')
         .eq('status', 'open')
         .order('created_at', { ascending: false });
 
-      setJobs(openJobs || []);
+      if (error) throw error;
+
+      setJobs(data || []);
     } catch (err) {
-      console.error(err);
-      Alert.alert('Error loading jobs');
-    } finally {
-      setLoading(false);
+      console.error('Failed to load jobs:', err);
+      Alert.alert('Error', 'Could not load available jobs');
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadOpenJobs();
+    setRefreshing(false);
   };
 
   const toggleAvailability = async (value: boolean) => {
@@ -82,7 +102,7 @@ export default function AvailableJobs() {
     const max = parseFloat(maxRate);
 
     if (isNaN(min) || isNaN(max) || min > max) {
-      Alert.alert('Invalid rates');
+      Alert.alert('Invalid rates', 'Please enter valid min/max numbers');
       return;
     }
 
@@ -91,9 +111,9 @@ export default function AvailableJobs() {
         .from('profiles')
         .update({ rate_min: min, rate_max: max })
         .eq('id', userId);
-      Alert.alert('Rates saved');
+      Alert.alert('Success', 'Rates updated');
     } catch (err) {
-      Alert.alert('Error saving rates');
+      Alert.alert('Error', 'Could not save rates');
     }
   };
 
@@ -111,23 +131,30 @@ export default function AvailableJobs() {
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Job accepted!');
-      // Refresh jobs list
-      initialize();
-    } catch (err) {
-      Alert.alert('Error', 'Could not accept job');
+      Alert.alert('Success', 'You have accepted the job!');
+      await loadOpenJobs(); // refresh list
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not accept job');
     }
   };
 
-  if (loading) return <ActivityIndicator size="large" style={styles.center} />;
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#ea580c" />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Back to Home button at the top */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.push('/')}
-      >
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* Back to Home */}
+      <TouchableOpacity style={styles.backButton} onPress={() => router.push('/')}>
         <Text style={styles.backButtonText}>← Back to Home</Text>
       </TouchableOpacity>
 
@@ -136,19 +163,20 @@ export default function AvailableJobs() {
       {/* Availability & Rates */}
       <View style={styles.settingsCard}>
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Available for new jobs</Text>
+          <Text style={styles.toggleLabel}>I'm available for new jobs</Text>
           <Switch
             value={isAvailable}
             onValueChange={toggleAvailability}
             trackColor={{ false: '#767577', true: '#ea580c' }}
+            thumbColor={isAvailable ? '#fff' : '#f4f3f4'}
           />
         </View>
 
-        <Text style={styles.label}>Your Hourly Rate Range</Text>
+        <Text style={styles.label}>Your Hourly Rate Range ($)</Text>
         <View style={styles.rateRow}>
           <TextInput
             style={styles.rateInput}
-            placeholder="Min ($)"
+            placeholder="Min"
             value={minRate}
             onChangeText={setMinRate}
             keyboardType="numeric"
@@ -156,12 +184,13 @@ export default function AvailableJobs() {
           <Text style={styles.rateDash}>–</Text>
           <TextInput
             style={styles.rateInput}
-            placeholder="Max ($)"
+            placeholder="Max"
             value={maxRate}
             onChangeText={setMaxRate}
             keyboardType="numeric"
           />
         </View>
+
         <TouchableOpacity style={styles.saveButton} onPress={saveRates}>
           <Text style={styles.buttonText}>Save Rates</Text>
         </TouchableOpacity>
@@ -174,10 +203,17 @@ export default function AvailableJobs() {
         jobs.map(job => (
           <View key={job.id} style={styles.jobCard}>
             <Text style={styles.jobTitle}>{job.title}</Text>
-            {job.category && <Text style={styles.jobCategory}>{job.category}</Text>}
-            <Text style={styles.jobDesc}>{job.description || 'No description'}</Text>
+            {job.category && (
+              <Text style={styles.jobCategory}>
+                Category: {job.category.charAt(0).toUpperCase() + job.category.slice(1)}
+              </Text>
+            )}
+            <Text style={styles.jobDesc}>
+              {job.description || 'No description provided'}
+            </Text>
             <Text style={styles.jobMeta}>
-              Location: {job.location || 'N/A'} • Date: {job.date_needed || 'Flexible'}
+              Location: {job.location || 'Not specified'} •{' '}
+              Date: {job.date_needed || 'Flexible'}
             </Text>
 
             <TouchableOpacity
@@ -194,22 +230,31 @@ export default function AvailableJobs() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 24 },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    padding: 24,
+  },
   backButton: {
-    marginTop: 30,
+    marginTop: 40,
     marginBottom: 24,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#2e91f4',
+    backgroundColor: '#371fea',
     alignSelf: 'flex-start',
   },
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#cbd5e1',
   },
-  title: { fontSize: 32, fontWeight: '700', color: '#0f172a', marginBottom: 24 },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 24,
+  },
   settingsCard: {
     backgroundColor: 'white',
     padding: 20,
@@ -227,8 +272,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  toggleLabel: { fontSize: 18, color: '#0f172a' },
-  label: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 8 },
+  toggleLabel: {
+    fontSize: 18,
+    color: '#0f172a',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
   rateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -243,7 +296,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: 'white',
   },
-  rateDash: { marginHorizontal: 12, fontSize: 20, color: '#64748b' },
+  rateDash: {
+    marginHorizontal: 12,
+    fontSize: 20,
+    color: '#64748b',
+  },
   saveButton: {
     backgroundColor: '#ea580c',
     padding: 16,
@@ -260,6 +317,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     marginTop: 32,
+    marginBottom: 32,
   },
   jobCard: {
     backgroundColor: 'white',
@@ -272,22 +330,43 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  jobTitle: { fontSize: 20, fontWeight: '600', color: '#0f172a', marginBottom: 8 },
-  jobCategory: { fontSize: 14, color: '#ea580c', marginBottom: 4 },
-  jobDesc: { fontSize: 16, color: '#475569', marginBottom: 12 },
-  jobMeta: { fontSize: 14, color: '#64748b', marginBottom: 16 },
+  jobTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  jobCategory: {
+    fontSize: 14,
+    color: '#ea580c',
+    marginBottom: 4,
+  },
+  jobDesc: {
+    fontSize: 16,
+    color: '#475569',
+    marginBottom: 12,
+  },
+  jobMeta: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 16,
+  },
   acceptButton: {
     backgroundColor: '#10b981',
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-  acceptText: { color: 'white', fontSize: 16, fontWeight: '600' },
+  acceptText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
     backgroundColor: '#f8fafc',
+    padding: 24,
   },
 });
