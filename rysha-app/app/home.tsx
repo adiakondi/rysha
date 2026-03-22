@@ -67,6 +67,13 @@ export default function Home() {
             </Text>
           </View>
 
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/post-job')}
+          >
+            <Text style={styles.actionButtonText}>Post a Job</Text>
+          </TouchableOpacity>
+
           {/* Button to profile (where logout lives) */}
           <TouchableOpacity style={styles.profileButton} onPress={goToProfile}>
             <Text style={styles.profileButtonText}>My Profile</Text>
@@ -126,7 +133,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     borderRadius: 12,
     marginTop: 'auto',
-    marginBottom: 40,
+    marginBottom: 10,
     width: '80%',
     alignItems: 'center',
   },
@@ -135,4 +142,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  actionButton: {
+    backgroundColor: '#ea580c',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+    marginBottom: 16,
+    width: '80%',
+    alignItems: 'center',
+},
+actionButtonText: {
+  color: 'white',
+  fontSize: 18,
+  fontWeight: '600',
+},
 });
